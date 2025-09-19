@@ -1,6 +1,4 @@
-# Install dependencies
-!pip install gradio scikit-learn tensorflow pandas xgboost
-
+import os
 import gradio as gr
 import pandas as pd
 import numpy as np
@@ -44,14 +42,12 @@ def train_models(disease):
     info = datasets[disease]
     df = pd.read_csv(info["url"])
     
-    # Fix column names if needed
     if "columns" in info:
         df.columns = info["columns"]
     
     X = df.drop(columns=[info["target"]])
     y = df[info["target"]]
     
-    # Encode target if needed
     if y.dtype == 'object':
         y = y.astype('category').cat.codes
     
@@ -60,27 +56,22 @@ def train_models(disease):
     
     models = {}
     
-    # Logistic Regression
     lr = LogisticRegression(max_iter=1000)
     lr.fit(X_scaled, y)
     models["Logistic Regression"] = lr
     
-    # SVM
     svm = SVC(probability=True)
     svm.fit(X_scaled, y)
     models["SVM"] = svm
     
-    # Random Forest
     rf = RandomForestClassifier(n_estimators=100, random_state=42)
     rf.fit(X_scaled, y)
     models["Random Forest"] = rf
     
-    # XGBoost
     xgb_model = xgb.XGBClassifier(use_label_encoder=False, eval_metric="logloss")
     xgb_model.fit(X_scaled, y)
     models["XGBoost"] = xgb_model
     
-    # Deep Learning
     dl = Sequential([
         Dense(32, activation='relu', input_shape=(X_scaled.shape[1],)),
         Dense(16, activation='relu'),
@@ -110,7 +101,6 @@ def predict(disease, model_choice, *inputs):
         prob = model.predict_proba(X_input_scaled)[0][1]
         pred = model.predict(X_input_scaled)[0]
 
-    # ✅ Human-readable results
     if disease == "Diabetes":
         label = "Diabetic" if pred == 1 else "Non-Diabetic"
     elif disease == "Heart Disease":
@@ -120,7 +110,6 @@ def predict(disease, model_choice, *inputs):
     else:
         label = str(pred)
 
-    # ✅ Confidence level
     confidence_score = prob * 100
     if confidence_score >= 80:
         confidence_label = f"High Confidence ({confidence_score:.2f}%)"
@@ -144,7 +133,6 @@ with gr.Blocks() as demo:
         label="Select Model"
     )
     
-    # Default to Diabetes input fields
     _, _, features = train_models("Diabetes")
     inputs = [gr.Number(label=f) for f in features]
     
@@ -155,4 +143,9 @@ with gr.Blocks() as demo:
     btn = gr.Button("🔍 Predict")
     btn.click(fn=predict, inputs=[disease, model_choice] + inputs, outputs=[output1, output2, output3])
 
-demo.launch(debug=True)
+# ✅ Launch with Render-compatible port
+demo.launch(
+    server_name="0.0.0.0",
+    server_port=int(os.environ.get("PORT", 7860)),
+    debug=True
+)
